@@ -16,3 +16,7 @@ func GenerateRandomString(byteLength int) (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
 }
+
+func FormatPrice(price float64) string {
+	return fmt.Sprintf("%.2f", price)
+}

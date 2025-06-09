@@ -4,18 +4,19 @@ import (
 	"fmt"
 	"log"
 
+	utils "dessert-ordering-go-system/internal/utils"
 	"dessert-ordering-go-system/models"
 )
 
 type ApplicationCartItem struct {
 	CartItem   *models.CartItem
-	Product    *models.Product
+	Product    *models.ProductForDisplay
 	Quantity   int
-	TotalPrice float64
+	TotalPrice string
 }
 
 type ApplicationProduct struct {
-	Product  *models.Product
+	Product  *models.ProductForDisplay
 	Quantity int
 }
 
@@ -26,7 +27,7 @@ type HomeTemplateData struct {
 	Messages          []string
 	Products          []ApplicationProduct
 	IsCartEmpty       bool
-	TotalCartPrice    float64
+	TotalCartPrice    string
 	TotalCartQuantity int
 }
 
@@ -107,6 +108,8 @@ func (s *HomeTemplateDataService) GetHomeTemplateContent(opts ...GetHomeTemplate
 			continue
 		}
 
+		displayProduct := models.NewProductForDisplay(product)
+
 		totalPrice := float64(cartItem.Quantity) * product.Price
 
 		totalCartPrice += totalPrice
@@ -114,17 +117,18 @@ func (s *HomeTemplateDataService) GetHomeTemplateContent(opts ...GetHomeTemplate
 
 		applicationCartItems = append(applicationCartItems, ApplicationCartItem{
 			CartItem:   cartItem,
-			Product:    product,
+			Product:    displayProduct,
 			Quantity:   cartItem.Quantity,
-			TotalPrice: totalPrice,
+			TotalPrice: utils.FormatPrice(totalPrice),
 		})
 	}
 
-	for index, product := range products {
+	displayProducts := models.NewProductsForDisplay(products)
+	for index, product := range displayProducts {
 		quantity := cartQuantities[product.ID]
 
 		applicationProducts = append(applicationProducts, ApplicationProduct{
-			Product:  products[index],
+			Product:  displayProducts[index],
 			Quantity: quantity,
 		})
 	}
@@ -134,7 +138,7 @@ func (s *HomeTemplateDataService) GetHomeTemplateContent(opts ...GetHomeTemplate
 	templateContent.Messages = []string{}
 	templateContent.IsCartEmpty = totalCartQuantity < 1
 	templateContent.Products = applicationProducts
-	templateContent.TotalCartPrice = totalCartPrice
+	templateContent.TotalCartPrice = utils.FormatPrice(totalCartPrice)
 	templateContent.TotalCartQuantity = totalCartQuantity
 
 	return templateContent, nil

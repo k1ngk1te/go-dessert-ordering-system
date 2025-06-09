@@ -5,6 +5,8 @@ import (
 	"log"
 	"sort"
 	"time"
+
+	utils "dessert-ordering-go-system/internal/utils"
 )
 
 type Product struct {
@@ -17,6 +19,52 @@ type Product struct {
 	Images      []string  `json:"images"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// ProductForDisplay is a variant of the Product struct designed for frontend display,
+// where the Price is formatted as a string.
+type ProductForDisplay struct {
+	ID          int       `json:"id"`
+	Title       string    `json:"title"`
+	Category    string    `json:"category"`
+	Description string    `json:"description"`
+	Price       string    `json:"price"` // Changed to string type
+	Thumbnail   string    `json:"thumbnail"`
+	Images      []string  `json:"images"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func NewProductForDisplay(p *Product) *ProductForDisplay {
+	if p == nil {
+		return nil
+	}
+	return &ProductForDisplay{
+		ID:          p.ID,
+		Title:       p.Title,
+		Category:    p.Category,
+		Description: p.Description,
+		// Format the float64 price to a string with 2 decimal places
+		Price:     utils.FormatPrice(p.Price),
+		Thumbnail: p.Thumbnail,
+		Images:    p.Images,
+		CreatedAt: p.CreatedAt,
+		UpdatedAt: p.UpdatedAt,
+	}
+}
+
+// NewProductsForDisplay converts a slice of models.Product pointers
+// to a slice of ProductForDisplay pointers.
+func NewProductsForDisplay(products []*Product) []*ProductForDisplay {
+	if products == nil {
+		return nil
+	}
+
+	displayProducts := make([]*ProductForDisplay, len(products))
+	for i, p := range products {
+		displayProducts[i] = NewProductForDisplay(p)
+	}
+	return displayProducts
 }
 
 type ProductImage struct {
