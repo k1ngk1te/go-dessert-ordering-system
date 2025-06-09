@@ -65,7 +65,6 @@ func NewApplication() *Application {
 	session := NewApplicationSession(sessionManager)
 
 	// Open a database connection
-	// sql.Open doesn't actually connect to the database yet; it just validates the DSN format.
 	db, err := openDB(os.Getenv("DSN"))
 	if err != nil {
 		loggers.Error.Fatalf("Error opening or connecting to database: %v", err)
