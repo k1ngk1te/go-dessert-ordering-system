@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product List With Cart</title>
+    <link rel="shortcut icon" href="/static/assets/images/favicon-32x32.png" type="image/png" />
+    <link rel="stylesheet" href="/static/css/main.css" />
+  </head>
+  <body>
+    <!-- Main Container -->
+    <div class="container">
+      <!-- Product List Container -->
+      <div class="product-list-container">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem">
+          <h1 class="app-title">Desserts</h1>
+          <form method="POST" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+            <button class="order-cta">Logout</button>
+          </form>
+        </div>
+        {{ if gt (len .Errors) 0 }} {{ range $i, $err := .Errors }}
+        <div class="alert-container alert-error" style="margin: 1rem 0">{{ $err }}</div>
+        {{ end }} {{ end }}
+        <ul class="products-list">
+          {{ range $i, $product := .Products }}
+          <li class="product-item">
+            <div class="product-image">
+              {{ range $i, $imgSrc := $product.Product.Images }}
+              <img src="/static{{ $imgSrc }}" alt="{{ $product.Product.Title }} {{ $i }}" />
+              {{ end }}
+            </div>
+
+            {{ if gt $product.Quantity 0 }}
+            <div class="product-add-to-cart">
+              <form method="POST" action="/cart/product/{{ $product.Product.ID }}/remove-one">
+                <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+                <button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="2" fill="none" viewBox="0 0 10 2">
+                    <path fill="currentColor" d="M0 .375h10v1.25H0V.375Z" />
+                  </svg>
+                </button>
+              </form>
+              <span class="product-quantity">{{ $product.Quantity }}</span>
+              <form method="POST" action="/cart">
+                <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+                <input type="hidden" name="productId" value="{{ $product.Product.ID }}" />
+                <button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 10 10">
+                    <path fill="currentColor" d="M10 4.375H5.625V0h-1.25v4.375H0v1.25h4.375V10h1.25V5.625H10v-1.25Z" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+            {{ else }}
+            <form method="POST" action="/cart">
+              <input type="hidden" name="productId" value="{{ $product.Product.ID }}" />
+              <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+              <button class="product-cta">
+                <img src="/static/assets/images/icon-add-to-cart.svg" alt="" />
+                Add to Cart
+              </button>
+            </form>
+            {{ end }}
+
+            <div class="product-info">
+              <h6 class="product-category">{{ $product.Product.Category }}</h6>
+              <h2 class="product-title">{{ $product.Product.Title }}</h2>
+              <p class="product-price">${{ $product.Product.Price }}</p>
+            </div>
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+
+      <!-- Order Items List -->
+      <div class="{{ if .IsCartEmpty }} empty {{ end }} cart">
+        <h1 class="cart-title">Your Cart ({{ .TotalCartQuantity }})</h1>
+
+        {{ if .IsCartEmpty }}
+        <!-- Cart Empty -->
+        <div class="cart-empty">
+          <div class="cart-empty-image">
+            <img src="/static/assets/images/illustration-empty-cart.svg" alt="Cart Empty" />
+          </div>
+          <p class="cart-empty-text">Your added items will appear here</p>
+        </div>
+        {{ else }}
+        <!-- Cart Not Empty -->
+        <div class="cart-order">
+          <ul class="order-items">
+            {{ range $i, $cartItem := .Cart }}
+            <li class="order-item">
+              <div class="order-item-container">
+                <h6 class="order-item-title">{{ $cartItem.Product.Title }}</h6>
+                <div class="order-item-info">
+                  <span class="quantity">{{ $cartItem.Quantity }}x</span>
+                  <span class="price">@ ${{ $cartItem.Product.Price }}</span>
+                  <span class="total-price">${{ $cartItem.TotalPrice }}</span>
+                </div>
+              </div>
+              <form method="POST" action="/cart/{{ $cartItem.CartItem.ID }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+                <button class="order-item-cta">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 10 10">
+                    <path
+                      fill="currentColor"
+                      d="M8.375 9.375 5 6 1.625 9.375l-1-1L4 5 .625 1.625l1-1L5 4 8.375.625l1 1L6 5l3.375 3.375-1 1Z"
+                    />
+                  </svg>
+                </button>
+              </form>
+            </li>
+            {{ end }}
+          </ul>
+          <div class="order-total">
+            <h5 class="order-total-title">Order Total</h5>
+            <h1 class="order-total-value">${{ .TotalCartPrice }}</h1>
+          </div>
+
+          <p class="carbon-neutral-delivery">
+            <img src="/static/assets/images/icon-carbon-neutral.svg" alt="" />
+            <span>This is a <b>carbon-neutral</b> delivery</span>
+          </p>
+
+          <a href="/confirm-order" class="order-cta">Confirm Order</a>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+
+    {{ if gt (len .Cart) 0 }}
+    <!-- Order Confirmation Modal -->
+    <div class="order-confirmation-modal" id="confirm-order">
+      <div class="order-confirmation">
+        <img class="order-confirmation-check" src="/static/assets/images/icon-order-confirmed.svg" alt="✅" />
+
+        <h1 class="order-confirmation-title">Order Confirmed</h1>
+
+        <p class="order-confirmation-description">We hope you enjoy your food!</p>
+
+        <div class="order-confirmed">
+          <ul class="order-confirmation-items">
+            {{ range $i, $cartItem := .Cart }}
+            <li class="order-confirmation-item">
+              <div class="order-confirmation-item-image">
+                <img src="/static{{ $cartItem.Product.Thumbnail }}" alt="{{ $cartItem.Product.Title }}" />
+              </div>
+              <div class="order-confirmation-item-container">
+                <div class="order-confirmation-item-content">
+                  <h6 class="order-item-title">{{ $cartItem.Product.Title }}</h6>
+                  <div class="order-item-info">
+                    <span class="quantity">{{ $cartItem.Quantity }}x</span>
+                    <span class="price">@ ${{ $cartItem.Product.Price }}</span>
+                  </div>
+                </div>
+                <div class="order-confirmation-item-total-price">
+                  <span class="total-price">${{ $cartItem.TotalPrice }}</span>
+                </div>
+              </div>
+            </li>
+            {{ end }}
+          </ul>
+          <div class="order-total">
+            <h5 class="order-total-title">Order Total</h5>
+            <h1 class="order-total-value">${{ .TotalCartPrice }}</h1>
+          </div>
+        </div>
+
+        <form action="/checkout" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ $.CsrfToken }}" />
+          <button class="order-cta">Start New Order</button>
+        </form>
+      </div>
+    </div>
+    {{ end }}
+  </body>
+</html>

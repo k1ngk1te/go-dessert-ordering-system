@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login to Dessert Ordering</title>
+    <link rel="shortcut icon" href="/static/assets/images/favicon-32x32.png" type="image/png" />
+    <link rel="stylesheet" href="/static/css/form.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h2>Login to Your Account</h2>
+
+      {{ with .Errors }} {{ range . }}
+      <p class="error-message">{{ . }}</p>
+      {{ end }} {{ end }} {{ with .Messages }} {{ range . }}
+      <p class="message">{{ . }}</p>
+      {{ end }} {{ end }}
+
+      <form action="/login" method="POST">
+        <input type="hidden" name="csrf_token" value="{{.CsrfToken}}" />
+
+        <div class="form-group">
+          <label for="contact">User ID</label>
+          <input
+            type="text"
+            id="contact"
+            name="contact"
+            required
+            autocomplete="contact"
+            value="{{.Form.Contact}}"
+            placeholder="Enter E-mail / Username"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            value="{{.Form.Password}}"
+            name="password"
+            required
+            autocomplete="password"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <p class="link-text">Don't have an account? <a href="/register">Sign Up Here</a></p>
+    </div>
+  </body>
+</html>

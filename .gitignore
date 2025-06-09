@@ -1,0 +1,65 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, generated with 'go test -c'
+*.test
+
+# Output of the go generate command
+*.pb.go
+
+# Endpoints
+*.env
+.env
+.env.*
+
+# Project-local vendored dependencies
+vendor/
+
+# Go module cache (usually ~/.cache/go-build)
+# This will be created inside your project if you use GOPATH mode or
+# if your module cache is configured to be inside your project.
+# It is generally safe to ignore, but if you have a specific reason
+# to commit it (e.g., for very specific reproducible builds in a monorepo
+# with constrained build environments), you might comment this out.
+# .go-build/
+
+# Go workspace file (added in Go 1.18)
+go.work.sum
+
+# IDEs and Editors
+.idea
+.idea/             # JetBrains (IntelliJ, GoLand, etc.)
+.vscode
+.vscode/           # VS Code
+*.sublime-project  # Sublime Text
+*.sublime-workspace
+.DS_Store          # macOS
+Thumbs.db          # Windows
+
+# Local settings and data
+.history/
+.vagrant/
+.terraform/
+*.local
+*.log
+logs/
+tmp/
+*.db
+*.sqlite3
+*.bak
+
+# Dependency management
+# These might include specific dependency locks or build-time caches
+# for various tools. Add as needed.
+# For example:
+# Gopkg.lock
+# Gopkg.toml
+# Godeps/
+# glide.lock
+# vendor/
+
+dump.rdb
