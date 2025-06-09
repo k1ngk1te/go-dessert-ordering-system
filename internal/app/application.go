@@ -11,9 +11,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gomodule/redigo/redis"
 	"github.com/joho/godotenv"
-
-	"dessert-ordering-go-system/models"
-	"dessert-ordering-go-system/services"
 )
 
 type Application struct {
@@ -24,29 +21,6 @@ type Application struct {
 	RedisPool *redis.Pool
 	Session   *ApplicationSession
 	Templates *template.Template
-}
-
-type ApplicationLoggers struct {
-	Error *log.Logger
-	Info  *log.Logger
-}
-
-type ApplicationModels struct {
-	// Reference the types from the 'models' package
-	CartItem     *models.CartItemModel
-	Product      *models.ProductModel
-	ProductImage *models.ProductImageModel
-	User         *models.UserModel
-}
-
-type ApplicationServices struct {
-	// Reference the types from the 'services' package
-	Auth                 *services.AuthService
-	CartItem             *services.CartItemService
-	Product              *services.ProductService
-	HomeTemplateData     *services.HomeTemplateDataService
-	LoginTemplateData    *services.LoginTemplateDataService
-	RegisterTemplateData *services.RegisterTemplateDataService
 }
 
 // Render Template Helper Function
@@ -66,19 +40,14 @@ func (a *Application) RenderHtmlTemplate(w http.ResponseWriter, templateName str
 
 func NewApplication() *Application {
 	// Initiate loggers
-	loggers := &ApplicationLoggers{
-		Error: log.New(os.Stdout, "ERROR\t", log.Ldate|log.Ltime),
-		Info:  log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime),
-	}
+	loggers := NewApplicationLoggers()
 
 	err := godotenv.Load()
 	if err != nil {
 		loggers.Info.Printf("Warning: Could not load .env file: %v. Assuming environment variables are set externally.", err)
 	}
 
-	var templates *template.Template // Initiate Template
-
-	templates, err = template.ParseFiles("./templates/index.html", "./templates/login.html", "./templates/register.html")
+	templates, err := NewApplicationTemplates()
 	if err != nil {
 		loggers.Error.Fatalf("Error parsing templates: %v", err)
 	}
@@ -92,7 +61,6 @@ func NewApplication() *Application {
 	}
 
 	// Initialize session manager
-
 	sessionManager := openSession(loggers, redisstore.New(redisPool))
 	session := NewApplicationSession(sessionManager)
 
@@ -104,28 +72,8 @@ func NewApplication() *Application {
 	}
 	loggers.Info.Println("Successfully connected to Database!")
 
-	models := &ApplicationModels{
-		CartItem:     &models.CartItemModel{DB: db},
-		Product:      &models.ProductModel{DB: db},
-		ProductImage: &models.ProductImageModel{DB: db},
-		User:         &models.UserModel{DB: db},
-	}
-
-	authService := services.NewAuthService(models.User)
-	cartService := services.NewCartItemService(models.CartItem)
-	productService := services.NewProductService(models.Product)
-	homeTemplateDataService := services.NewHomeTemplateDataService(models.CartItem, models.Product)
-	loginTemplateDataService := services.NewLoginTemplateDataService()
-	registerTemplateDataService := services.NewRegisterTemplateDataService()
-
-	services := &ApplicationServices{
-		Auth:                 authService,
-		CartItem:             cartService,
-		Product:              productService,
-		HomeTemplateData:     homeTemplateDataService,
-		LoginTemplateData:    loginTemplateDataService,
-		RegisterTemplateData: registerTemplateDataService,
-	}
+	models := NewApplicationModels(db)
+	services := NewApplicationServices(models)
 
 	a := &Application{
 		DB:        db,
@@ -136,6 +84,5 @@ func NewApplication() *Application {
 		Session:   session,
 		Templates: templates,
 	}
-
 	return a
 }
