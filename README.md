@@ -63,7 +63,6 @@ This project is a robust and secure web application for a dessert ordering syste
 - **`golang-jwt/jwt/v5`:** For generating and validating JSON Web Tokens for API authentication.
 - **`bcrypt`:** For secure one-way password hashing.
 - **`DotEnv`:** For managing environment variables.
-- **Docker & Docker Compose:** For easy setup and management of database and Redis services.
 
 ## 4. Architecture & Design Principles
 
@@ -83,7 +82,6 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 - **Go:** Version 1.22 or higher.
 - **Git:** For cloning the repository.
-- **Docker & Docker Compose:** (Recommended) For easily setting up MySQL and Redis. Alternatively, you can install and configure them manually.
 
 ### Environment Variables
 
