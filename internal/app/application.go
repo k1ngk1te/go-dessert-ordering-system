@@ -1,14 +1,11 @@
 package app
 
 import (
-	"context"
 	"database/sql"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/alexedwards/scs/redisstore"
 	_ "github.com/go-sql-driver/mysql"
@@ -50,54 +47,6 @@ type ApplicationServices struct {
 	HomeTemplateData     *services.HomeTemplateDataService
 	LoginTemplateData    *services.LoginTemplateDataService
 	RegisterTemplateData *services.RegisterTemplateDataService
-}
-
-func openDB(dsn string) (*sql.DB, error) {
-	if dsn == "" {
-		return nil, fmt.Errorf("dsn environment variable not set or loaded")
-	}
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = db.PingContext(ctx)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
-	return db, nil
-}
-
-func openRedisPool() (*redis.Pool, error) {
-	redisPool := &redis.Pool{
-		MaxIdle: 10,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial(
-				"tcp",
-				os.Getenv("REDIS_ADDR"),
-				redis.DialPassword(os.Getenv("REDIS_PASSWORD")),
-			)
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			// Ping the connection to ensure it's still alive
-			_, err := c.Do("PING")
-			return err
-		},
-		IdleTimeout: 240 * time.Second,
-	}
-
-	// Test Redis connection by getting and immediately releasing a connection
-	conn := redisPool.Get()
-	defer conn.Close() // Ensure the connection is returned to the pool
-	_, err := conn.Do("PING")
-	if err != nil {
-		return redisPool, err
-	}
-	return redisPool, nil
 }
 
 // Render Template Helper Function
