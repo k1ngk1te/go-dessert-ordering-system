@@ -12,8 +12,8 @@ type LoginTemplateData struct {
 }
 
 type LoginForm struct {
-	Contact  string `json:"contact"`
-	Password string `json:"password"`
+	Contact  string `json:"contact" form:"contact" validate:"required"`
+	Password string `json:"password" form:"password" validate:"required"`
 }
 
 func (c LoginTemplateData) String() string {

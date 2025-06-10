@@ -12,9 +12,9 @@ type RegisterTemplateData struct {
 }
 
 type RegisterForm struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Username string `json:"username" form:"username" validate:"required,min=4,max=255"`
+	Email    string `json:"email" form:"email" validate:"required,email,min=6,max=255"`
+	Password string `json:"password" form:"password" validate:"required,min=6,max=255"`
 }
 
 func (c RegisterTemplateData) String() string {

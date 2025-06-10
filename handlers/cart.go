@@ -16,7 +16,7 @@ import (
 )
 
 type AddOrder struct {
-	ProductID int `json:"productId"`
+	ProductID int `json:"productId" form:"productId" validate:"required,min=1"`
 }
 
 func (h *WebHandler) GetCartHandler(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +103,32 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 		}
 
 		addOrder.ProductID = productId
+	}
+
+	// -- Validation Goes Here --
+	// -- Perform Validation --
+	validationErrors := h.Validator.ValidateStruct(addOrder)
+	if validationErrors != nil {
+		if strings.HasPrefix(acceptType, "application/json") {
+			response := responses.NewErrorJsonDataResponse("Validation failed", validationErrors)
+			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
+		} else {
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
+			if templateDataErr != nil {
+				h.Loggers.Error.Printf("ERROR: PostRegisterHandler - GetRegisterTemplateContent on validation error: %v", templateDataErr)
+				http.Error(w, "Failed to reload index page after validation error", http.StatusInternalServerError)
+				return
+			}
+
+			for field, msg := range validationErrors {
+				data.Errors = append(data.Errors, fmt.Sprintf("%s: %s", field, msg))
+			}
+			h.RenderHtmlTemplate(w, "index.html", data, http.StatusBadRequest) // 400 Bad Request
+		}
+		return
 	}
 
 	err := h.Services.CartItem.AddCartItem(userID, addOrder.ProductID)

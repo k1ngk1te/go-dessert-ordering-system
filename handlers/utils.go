@@ -64,3 +64,4 @@ func JsonBodyDecoder(w http.ResponseWriter, r *http.Request, v any) (int, error)
 
 	return http.StatusOK, nil // Or just 'return nil, 0' if you don't want to suggest a status code
 }
+

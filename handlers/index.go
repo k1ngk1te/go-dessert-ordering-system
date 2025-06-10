@@ -8,14 +8,19 @@ import (
 	"dessert-ordering-go-system/internal/app"
 	appConstants "dessert-ordering-go-system/internal/app_constants"
 	responses "dessert-ordering-go-system/internal/response"
+	validators "dessert-ordering-go-system/validators"
 )
 
 type WebHandler struct {
 	*app.Application
+	Validator *validators.Validator
 }
 
-func NewWebHandlers(a *app.Application) *WebHandler {
-	return &WebHandler{a}
+func NewWebHandlers(a *app.Application) *WebHandler {	
+	return &WebHandler{
+		Application: a,
+		Validator: validators.NewValidator(),
+	}
 }
 
 func (h *WebHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {

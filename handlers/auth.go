@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -32,6 +33,8 @@ func (h *WebHandler) GetLoginHandler(w http.ResponseWriter, r *http.Request) {
 func (h *WebHandler) PostLoginHandler(w http.ResponseWriter, r *http.Request) {
 	acceptType := r.Header.Get("Accept")
 
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+
 	var formData services.LoginForm
 
 	if r.Header.Get("Content-Type") == "application/json" {
@@ -46,13 +49,35 @@ func (h *WebHandler) PostLoginHandler(w http.ResponseWriter, r *http.Request) {
 		formData.Password = r.FormValue("password")
 	}
 
+	// -- Perform Validation --
+	validationErrors := h.Validator.ValidateStruct(formData)
+	if validationErrors != nil {
+		if strings.HasPrefix(acceptType, "application/json") {
+			response := responses.NewErrorJsonDataResponse("Validation failed", validationErrors)
+			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
+		} else {
+			data, templateDataErr := h.Services.LoginTemplateData.GetLoginTemplateContent(h.Services.LoginTemplateData.WithCsrfToken(csrfToken))
+			if templateDataErr != nil {
+				h.Loggers.Error.Printf("ERROR: PostLoginHandler - GetLoginTemplateContent on validation error: %v", templateDataErr)
+				http.Error(w, "Failed to reload login page after validation error", http.StatusInternalServerError)
+				return
+			}
+			data.Form = &formData
+
+			for field, msg := range validationErrors {
+				data.Errors = append(data.Errors, fmt.Sprintf("%s: %s", field, msg))
+			}
+			h.RenderHtmlTemplate(w, "login.html", data, http.StatusBadRequest) // 400 Bad Request
+		}
+		return
+	}
+
 	userData, err := h.Services.Auth.Authenticate(formData.Contact, formData.Password)
 	if err != nil {
 		if strings.HasPrefix(acceptType, "application/json") {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
 			data, templateDataErr := h.Services.LoginTemplateData.GetLoginTemplateContent(h.Services.LoginTemplateData.WithCsrfToken(csrfToken))
 			if templateDataErr != nil {
 				h.Loggers.Error.Printf("ERROR: PostLoginHandler - GetLoginTemplateContent: %v", templateDataErr)
@@ -85,7 +110,6 @@ func (h *WebHandler) PostLoginHandler(w http.ResponseWriter, r *http.Request) {
 	authData := h.Services.Auth.CreateAuthData(*userData, token)
 
 	if strings.HasPrefix(acceptType, "application/json") {
-		csrfToken := h.Session.GetCsrfToken(r.Context())
 		response := responses.NewSuccessJsonDataResponse("Log in successful", authData)
 		secureCookies, _ := appConstants.GetSecureCookies()
 		cookie := &http.Cookie{
@@ -127,6 +151,8 @@ func (h *WebHandler) PostRegisterHandler(w http.ResponseWriter, r *http.Request)
 	acceptType := r.Header.Get("Accept")
 	contentType := r.Header.Get("Content-Type")
 
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+
 	var formData services.RegisterForm
 
 	if strings.HasPrefix(contentType, "application/json") {
@@ -142,13 +168,35 @@ func (h *WebHandler) PostRegisterHandler(w http.ResponseWriter, r *http.Request)
 		formData.Password = r.FormValue("password")
 	}
 
+	// -- Perform Validation --
+	validationErrors := h.Validator.ValidateStruct(formData)
+	if validationErrors != nil {
+		if strings.HasPrefix(acceptType, "application/json") {
+			response := responses.NewErrorJsonDataResponse("Validation failed", validationErrors)
+			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
+		} else {
+			data, templateDataErr := h.Services.RegisterTemplateData.GetRegisterTemplateContent(h.Services.RegisterTemplateData.WithCsrfToken(csrfToken))
+			if templateDataErr != nil {
+				h.Loggers.Error.Printf("ERROR: PostRegisterHandler - GetRegisterTemplateContent on validation error: %v", templateDataErr)
+				http.Error(w, "Failed to reload register page after validation error", http.StatusInternalServerError)
+				return
+			}
+			data.Form = &formData
+
+			for field, msg := range validationErrors {
+				data.Errors = append(data.Errors, fmt.Sprintf("%s: %s", field, msg))
+			}
+			h.RenderHtmlTemplate(w, "register.html", data, http.StatusBadRequest) // 400 Bad Request
+		}
+		return
+	}
+
 	err := h.Services.Auth.RegisterUser(formData.Username, formData.Email, formData.Password)
 	if err != nil {
 		if strings.HasPrefix(acceptType, "application/json") {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
 			data, templateDataErr := h.Services.RegisterTemplateData.GetRegisterTemplateContent(h.Services.RegisterTemplateData.WithCsrfToken(csrfToken))
 			if templateDataErr != nil {
 				h.Loggers.Error.Printf("ERROR: PostRegisterHandler - GetRegisterTemplateContent: %v", templateDataErr)
@@ -162,7 +210,6 @@ func (h *WebHandler) PostRegisterHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	csrfToken := h.Session.GetCsrfToken(r.Context())
 	if strings.HasPrefix(acceptType, "application/json") {
 		response := responses.NewSuccessJsonResponse("Registration successful")
 		responses.WriteJsonHeadersResponse(w, http.StatusOK, response, map[string]string{appConstants.X_CSRF_Token: csrfToken})
