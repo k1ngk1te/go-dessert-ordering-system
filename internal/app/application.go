@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/alexedwards/scs/redisstore"
 	_ "github.com/go-sql-driver/mysql"
@@ -14,6 +15,7 @@ import (
 )
 
 type Application struct {
+	DEBUG     bool
 	DB        *sql.DB
 	Loggers   *ApplicationLoggers
 	Models    *ApplicationModels
@@ -47,6 +49,18 @@ func NewApplication() *Application {
 		loggers.Info.Printf("Warning: Could not load .env file: %v. Assuming environment variables are set externally.", err)
 	}
 
+	debug := false
+	if debugEnv := os.Getenv("DEBUG"); debugEnv != "" {
+		parsedBool, err := strconv.ParseBool(debugEnv)
+		if err != nil {
+			loggers.Error.Fatalf("error: DEBUG value must be a boolean. i.e. true of false - %v", parsedBool)
+		} else {
+			debug = parsedBool
+		}
+	} else {
+		loggers.Info.Printf("Warning: DEBUG config not set in environment variables. Default to false")
+	}
+
 	templates, err := NewApplicationTemplates()
 	if err != nil {
 		loggers.Error.Fatalf("Error parsing templates: %v", err)
@@ -75,6 +89,7 @@ func NewApplication() *Application {
 	services := NewApplicationServices(models)
 
 	a := &Application{
+		DEBUG:     debug,
 		DB:        db,
 		Loggers:   loggers,
 		Models:    models,
