@@ -7,12 +7,18 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"dessert-ordering-go-system/models"
+	appConstants "dessert-ordering-go-system/internal/app_constants"
+	models "dessert-ordering-go-system/models"
 )
 
 type AuthService struct {
 	UserModel *models.UserModel
 	JWTSecret []byte
+}
+
+type AuthData struct {
+	User  models.UserData `json:"user"`
+	Token string          `json:"token"`
 }
 
 type UserClaims struct {
@@ -49,8 +55,12 @@ func (a *AuthService) RegisterUser(username, email, password string) error {
 	return a.UserModel.CreateUser(username, email, password)
 }
 
+func (a *AuthService) GetTokenExpiration() time.Duration {
+	return appConstants.Jwt_Expiration
+}
+
 func (a *AuthService) GenerateAuthToken(userID int, username, email string) (string, error) {
-	expirationTime := time.Now().Add(1 * time.Hour)
+	expirationTime := time.Now().Add(appConstants.Jwt_Expiration)
 
 	claims := &UserClaims{
 		ID:       userID,
@@ -70,4 +80,11 @@ func (a *AuthService) GenerateAuthToken(userID int, username, email string) (str
 	}
 
 	return signedToken, nil
+}
+
+func (a *AuthService) CreateAuthData(userData models.UserData, token string) *AuthData {
+	return &AuthData{
+		User:  userData,
+		Token: token,
+	}
 }

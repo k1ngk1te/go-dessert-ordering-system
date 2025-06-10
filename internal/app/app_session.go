@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/alexedwards/scs/redisstore"
@@ -29,14 +27,9 @@ func openSession(loggers *ApplicationLoggers, redisStore *redisstore.RedisStore)
 	sessionManager.Cookie.Persist = true
 	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
 	sessionManager.Cookie.HttpOnly = true
-	secureCookies := true
-	if secureEnv := os.Getenv("SECURE_COOKIES"); secureEnv != "" {
-		parsedBool, err := strconv.ParseBool(secureEnv)
-		if err != nil {
-			loggers.Info.Printf("Warning: SECURE_COOKIES environment variable '%s' is not a valid boolean (expected 'true' or 'false'). Defaulting to secure cookies (true).", secureEnv)
-		} else {
-			secureCookies = parsedBool
-		}
+	secureCookies, err := appConstants.GetSecureCookies()
+	if err != nil {
+		loggers.Info.Println(err.Error())
 	}
 	sessionManager.Cookie.Secure = secureCookies
 	sessionManager.Store = redisStore

@@ -15,10 +15,24 @@ import (
 // it returns nil for error and http.StatusOK (though the status code
 // for success is less critical as the caller will set it).
 func JsonBodyDecoder(w http.ResponseWriter, r *http.Request, v any) (int, error) {
+	// 1. Explicitly check Content-Type header.
+	// This helps ensure the client sends the correct header for JSON APIs.
+	if r.Header.Get("Content-Type") != "application/json" {
+		return http.StatusUnsupportedMediaType, errors.New("Content-Type header must be 'application/json'")
+	}
+
 	// Limit the size of the request body to prevent abuse
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // 1MB limit
 
-	err := json.NewDecoder(r.Body).Decode(v)
+	// After a successful decode, it's good practice to read the rest of the body
+	// to ensure the connection can be reused (HTTP keep-alive).
+	// This drains any remaining data in the body.
+	defer r.Body.Close() // Ensure the body is closed
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields() // This will return an error if JSON has fields not in your struct
+
+	err := decoder.Decode(v)
 	if err != nil {
 		var syntaxError *json.SyntaxError
 		var unmarshalTypeError *json.UnmarshalTypeError
@@ -46,10 +60,6 @@ func JsonBodyDecoder(w http.ResponseWriter, r *http.Request, v any) (int, error)
 		}
 	}
 
-	// After a successful decode, it's good practice to read the rest of the body
-	// to ensure the connection can be reused (HTTP keep-alive).
-	// This drains any remaining data in the body.
-	defer r.Body.Close() // Ensure the body is closed
 	io.Copy(io.Discard, r.Body)
 
 	return http.StatusOK, nil // Or just 'return nil, 0' if you don't want to suggest a status code

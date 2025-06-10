@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	appConstants "dessert-ordering-go-system/internal/app_constants"
 	responses "dessert-ordering-go-system/internal/response"
@@ -29,13 +30,12 @@ func (h *WebHandler) GetLoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebHandler) PostLoginHandler(w http.ResponseWriter, r *http.Request) {
-	acceptType := w.Header().Get("Accept")
-	contentType := w.Header().Get("Content-Type")
+	acceptType := r.Header.Get("Accept")
 
-	formData := &services.LoginForm{}
+	var formData services.LoginForm
 
-	if strings.HasPrefix(contentType, "application/json") {
-		errStatusCode, err := JsonBodyDecoder(w, r, formData)
+	if r.Header.Get("Content-Type") == "application/json" {
+		errStatusCode, err := JsonBodyDecoder(w, r, &formData)
 		if err != nil {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, errStatusCode, response)
@@ -59,17 +59,45 @@ func (h *WebHandler) PostLoginHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
-			data.Form = formData
+			data.Form = &formData
 			data.Errors = append(data.Errors, err.Error())
 			h.RenderHtmlTemplate(w, "login.html", data, http.StatusUnauthorized)
 		}
 		return
 	}
 
-	h.Session.SetAuthUserID(r.Context(), userData.ID)
-	csrfToken := h.Session.GetCsrfToken(r.Context())
+	// Log in the user
+	h.Session.SetAuthUserID(r.Context(), userData.ID) // Session Auth
+
+	token, err := h.Services.Auth.GenerateAuthToken(userData.ID, userData.Username, userData.Email)
+	if err != nil {
+		h.Loggers.Error.Printf("ERROR: PostLoginHandler - h.Services.Auth.GenerateAuthToken: %v", err)
+		h.Session.SetFlashError(r.Context(), err.Error())
+		if strings.HasPrefix(acceptType, "application/json") {
+			response := responses.NewErrorJsonResponse(err.Error())
+			responses.WriteJsonResponse(w, http.StatusInternalServerError, response)
+		} else {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+		}
+		return
+	}
+
+	authData := h.Services.Auth.CreateAuthData(*userData, token)
+
 	if strings.HasPrefix(acceptType, "application/json") {
-		response := responses.NewSuccessJsonDataResponse("Log in successful", userData)
+		csrfToken := h.Session.GetCsrfToken(r.Context())
+		response := responses.NewSuccessJsonDataResponse("Log in successful", authData)
+		secureCookies, _ := appConstants.GetSecureCookies()
+		cookie := &http.Cookie{
+			Name:     appConstants.Jwt_Name,
+			Value:    authData.Token,
+			Expires:  time.Now().Add(h.Services.Auth.GetTokenExpiration()),
+			HttpOnly: true,
+			Secure:   secureCookies,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/",
+		}
+		http.SetCookie(w, cookie)
 		responses.WriteJsonHeadersResponse(w, http.StatusOK, response, map[string]string{appConstants.X_CSRF_Token: csrfToken})
 		return
 	}
@@ -96,13 +124,13 @@ func (h *WebHandler) GetRegisterHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *WebHandler) PostRegisterHandler(w http.ResponseWriter, r *http.Request) {
-	acceptType := w.Header().Get("Accept")
-	contentType := w.Header().Get("Content-Type")
+	acceptType := r.Header.Get("Accept")
+	contentType := r.Header.Get("Content-Type")
 
-	formData := &services.RegisterForm{}
+	var formData services.RegisterForm
 
 	if strings.HasPrefix(contentType, "application/json") {
-		errStatusCode, err := JsonBodyDecoder(w, r, formData)
+		errStatusCode, err := JsonBodyDecoder(w, r, &formData)
 		if err != nil {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, errStatusCode, response)
@@ -127,7 +155,7 @@ func (h *WebHandler) PostRegisterHandler(w http.ResponseWriter, r *http.Request)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
-			data.Form = formData
+			data.Form = &formData
 			data.Errors = append(data.Errors, err.Error())
 			h.RenderHtmlTemplate(w, "register.html", data, http.StatusUnauthorized)
 		}
