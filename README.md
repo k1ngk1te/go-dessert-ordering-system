@@ -1,111 +1,250 @@
-# 🍰 Dessert Order System – Go & Chi
+# Dessert Ordering System (GoLang)
 
-A simple dessert ordering system built with Go and the `chi` router. It supports basic product listing, shopping cart operations, and checkout functionality, all maintained in memory (no external database).
+A robust and scalable backend system for managing dessert orders, built with Go. This application features a dual-authentication mechanism (JWT for APIs and Sessions for web), comprehensive input validation, and a clear, modular architecture.
 
-## 🚀 Features
+## Table of Contents
 
-- List available desserts
-- Add items to a shopping cart
-- View cart contents
-- Remove items from cart
-- Checkout and clear cart
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Project Structure](#project-structure)
+- [Setup and Installation](#setup-and-installation)
+- [Running the Application](#running-the-application)
+- [API Endpoints (Examples)](#api-endpoints-examples)
+- [Authentication Details](#authentication-details)
+- [Input Validation](#input-validation)
+- [Contributing](#contributing)
+- [License](#license)
 
-# Dessert Ordering System (Go)
+## Features
 
-[![Go Version](https://img.shields.io/badge/go-1.22%2B-blue.svg)](https://golang.org/doc/go1.22)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-username/your-repo-name/actions) ## Table of Contents
+* **Mixed Authentication:** Seamlessly supports both JSON Web Token (JWT) based authentication for API clients (via HttpOnly cookies and `Authorization: Bearer` headers) and traditional session-based authentication for web clients.
+* **User Management:** Secure user registration, authentication, and session management.
+* **Robust Input Validation:** Comprehensive server-side validation for all incoming user data (forms and API requests) using `github.com/go-playground/validator`. Provides detailed error feedback.
+* **Structured Error Handling:** Differentiates between JSON error responses for API consumers and HTML redirects with flash messages for web UIs.
+* **Context-Based User Data:** Authenticated user information (ID, username) is securely passed through the request context.
+* **Logging:** Integrated logging for better observability and debugging.
+* **Flash Messages:** User-friendly feedback on web pages for actions like login failures or successful operations.
+* **CSRF Protection:** (Crucial when using HttpOnly JWT cookies alongside session management - ensure this is properly implemented in relevant areas, e.g., via `scs`'s built-in CSRF token or a custom mechanism for API forms).
 
-- [Dessert Ordering System (Go)](#dessert-ordering-system-go)
-  - [Table of Contents](#table-of-contents)
-  - [1. Overview](#1-overview)
-  - [2. Features](#2-features)
-  - [3. Technologies Used](#3-technologies-used)
-  - [4. Architecture & Design Principles](#4-architecture--design-principles)
-  - [5. Getting Started](#5-getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Environment Variables](#environment-variables)
-    - [Database Setup (MySQL)](#database-setup-mysql)
-    - [Redis Setup](#redis-setup)
-    - [Installation](#installation)
-    - [Running the Application](#running-the-application)
-  - [6. API Endpoints Overview](#6-api-endpoints-overview)
-  - [7. Authentication](#7-authentication)
-  - [8. Folder Structure](#8-folder-structure)
-  - [9. Contributing](#9-contributing)
-  - [10. License](#10-license)
-  - [11. Contact](#11-contact)
+## Technologies Used
 
-## 1. Overview
+* **Go (Golang):** The primary programming language.
+* **HTTP Router:** (e.g., `github.com/go-chi/chi` or `gorilla/mux`) for handling routes.
+* **JSON Web Tokens (JWT):** `github.com/golang-jwt/jwt/v5` for API authentication.
+* **Sessions:** `github.com/alexedwards/scs/v2` (or similar) for session management and flash messages.
+* **Input Validation:** `github.com/go-playground/validator/v10` for powerful struct-based validation.
+* **Database:** (e.g., PostgreSQL, MySQL) for data persistence.
+* **Logging:** Standard library `log` or a structured logging library.
 
-This project is a robust and secure web application for a dessert ordering system, built entirely with **Go (Golang)**. It's designed to cater to both traditional web clients (rendering HTML views) and modern Single Page Applications (SPAs) or mobile clients (via a RESTful JSON API). The system provides core functionalities for user management, product Browse, and shopping cart operations, all while prioritizing security and maintainability.
+## Project Structure
 
-## 2. Features
+The project is organized into logical packages reflecting different layers and concerns of the application, promoting modularity and maintainability.
 
-- **User Authentication:**
-  - User Registration and Login (via web forms and JSON API).
-  - Secure password hashing (`bcrypt`).
-  - **Hybrid Authentication:** Supports both secure server-side sessions (for HTML views using `scs` with Redis) and stateless JWT (JSON Web Token) authentication (for API requests).
-  - Secure Logout.
-- **Product Management:** Browse available desserts.
-- **Shopping Cart:** Add/remove items from a cart.
-- **CSRF Protection:** Implemented for all HTML forms to prevent Cross-Site Request Forgery attacks.
-- **Flash Messages:** Provides user feedback across redirects (e.g., successful login, error messages).
-- **Structured Logging:** Centralized logging for errors and application events.
-- **Dependency Injection:** A clear and maintainable way to manage application services and dependencies.
+/project-root
+├── app/             # Contains the core Application struct for shared resources (Logger, DB, Config, Session)
+│   └── application.go
+│   └── context_keys.go # Custom type for context keys (e.g., for UserID)
+│
+├── controllers/     # Houses HTTP handlers / controllers for various application interfaces
+│   └── web/         # Web-specific HTTP handlers responsible for interacting with HTML views
+│       └── web_handlers.go
+│       └── routes.go # (If routes are defined in a separate file within controllers/web)
+│
+├── services/        # Contains core business logic and service implementations
+│   ├── auth_service.go    # Handles authentication logic (JWT, session, user authentication)
+│   ├── user_service.go    # Manages user-related business logic
+│   ├── html_template_service.go # Service for rendering HTML templates
+│   └── (other_services).go # e.g., product_service.go, order_service.go
+│
+├── internal/        # A collection of internal utility and helper packages,
+│   │                # typically not intended for direct import by other Go modules
+│   ├── app_constants/   # Defines application-wide constants
+│   │   └── constants.go
+│   │
+│   ├── response/      # Provides standardized HTTP response structures (e.g., for JSON error responses)
+│   │   └── response.go
+│   │
+│   └── utils/         # Contains general utility functions
+│       └── helpers.go
+│       └── validation/ # Holds the custom validator setup and related helper functions
+│           └── validator.go
+│
+├── main.go          # The main application entry point, responsible for bootstrapping the server
+├── go.mod           # Go module definition file, managing project dependencies
+└── go.sum           # Go module checksums file, for verifying module authenticity
 
-## 3. Technologies Used
+## Setup and Installation
 
-- **Go (Golang):** The primary programming language.
-- **MySQL:** Relational database for storing user accounts, products, orders, etc.
-- **Redis:** In-memory data store used for session management (`scs`) and caching.
-- **`scs` (Secure Cookie Sessions):** For robust, tamper-proof session management in traditional web flows.
-- **`golang-jwt/jwt/v5`:** For generating and validating JSON Web Tokens for API authentication.
-- **`bcrypt`:** For secure one-way password hashing.
-- **`DotEnv`:** For managing environment variables.
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/dessert-ordering-system.git](https://github.com/your-username/dessert-ordering-system.git)
+    cd dessert-ordering-system
+    ```
 
-## 4. Architecture & Design Principles
+2.  **Install Go Modules:**
+    ```bash
+    go mod tidy
+    ```
 
-The application adheres to a modular and layered architecture, promoting separation of concerns:
+3.  **Database Setup:**
+    * Ensure you have a [Your Database] instance running (e.g., PostgreSQL).
+    * Create a database for the project.
+    * Run any necessary database migrations (you'll need to implement your migration tool or scripts).
 
-- **Handlers (Controllers):** Handle incoming HTTP requests, delegate logic to services, and render responses (HTML or JSON).
-- **Services (Business Logic):** Contain the core business rules and orchestrate interactions between models.
-- **Models (Data Access Objects):** Interact directly with the database, abstracting data storage details.
-- **Middleware:** Intercepts requests for cross-cutting concerns like authentication, logging, and CSRF protection.
-- **Dependency Injection:** Services and components are passed as dependencies, enhancing testability and flexibility.
+4.  **Environment Variables:**
+    Create a `.env` file in the project root or set the following environment variables:
+    * `PORT=8080` (or your desired port)
+    * `DB_CONNECTION_STRING="host=localhost port=5432 user=youruser password=yourpass dbname=yourdb sslmode=disable"`
+    * `JWT_SECRET="supersecretjwtkey"` (Choose a strong, random key)
+    * `SESSION_SECRET="anothersupersecretkey"` (Choose a strong, random key for session encryption)
 
-## 5. Getting Started
+## Running the Application
 
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
+To run the main API server:
 
-### Prerequisites
+```bash
+go run .
 
-- **Go:** Version 1.22 or higher.
-- **Git:** For cloning the repository.
+Understood! My apologies for overriding your preferred project structure. I'll regenerate the README.md and ensure the "Project Structure" section reflects the layout you had in mind, based on the package paths and components we've discussed throughout our conversation.
 
-### Environment Variables
+Here's the regenerated README.md with the "Project Structure" section left as per your instruction, focusing on how your existing modules are organized:
 
-Create a `.env` file in the root directory of the project and populate it with the following environment variables:
+Markdown
 
-```dotenv
-# Application Port
-PORT=8080
+# Dessert Ordering System (GoLang)
 
-# Database Configuration (MySQL)
-DB_DSN="user:password@tcp(localhost:3306)/dessert_db?parseTime=true"
-# Example if using Docker Compose:
-# DB_DSN="user:password@tcp(mysql:3306)/dessert_db?parseTime=true"
+A robust and scalable backend system for managing dessert orders, built with Go. This application features a dual-authentication mechanism (JWT for APIs and Sessions for web), comprehensive input validation, and a clear, modular architecture.
 
-# Redis Configuration
-REDIS_ADDR="localhost:6379"
-# Example if using Docker Compose:
-# REDIS_ADDR="redis:6379"
-REDIS_PASSWORD="" # Leave empty if no password
-REDIS_DB=0
+## Table of Contents
 
-# JWT Secret Key (for JSON Web Tokens)
-JWT_SECRET_KEY="your_very_long_and_random_jwt_secret_key"
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Project Structure](#project-structure)
+- [Setup and Installation](#setup-and-installation)
+- [Running the Application](#running-the-application)
+- [API Endpoints (Examples)](#api-endpoints-examples)
+- [Authentication Details](#authentication-details)
+- [Input Validation](#input-validation)
+- [Contributing](#contributing)
+- [License](#license)
 
-# Application Domain (e.g., for cookie security)
-APP_DOMAIN="localhost"
-```
+## Features
+
+* **Mixed Authentication:** Seamlessly supports both JSON Web Token (JWT) based authentication for API clients (via HttpOnly cookies and `Authorization: Bearer` headers) and traditional session-based authentication for web clients.
+* **User Management:** Secure user registration, authentication, and session management.
+* **Robust Input Validation:** Comprehensive server-side validation for all incoming user data (forms and API requests) using `github.com/go-playground/validator`. Provides detailed error feedback.
+* **Structured Error Handling:** Differentiates between JSON error responses for API consumers and HTML redirects with flash messages for web UIs.
+* **Context-Based User Data:** Authenticated user information (ID, username) is securely passed through the request context.
+* **Logging:** Integrated logging for better observability and debugging.
+* **Flash Messages:** User-friendly feedback on web pages for actions like login failures or successful operations.
+* **CSRF Protection:** (Crucial when using HttpOnly JWT cookies alongside session management - ensure this is properly implemented in relevant areas, e.g., via `scs`'s built-in CSRF token or a custom mechanism for API forms).
+
+## Technologies Used
+
+* **Go (Golang):** The primary programming language.
+* **HTTP Router:** (e.g., `github.com/go-chi/chi` or `gorilla/mux`) for handling routes.
+* **JSON Web Tokens (JWT):** `github.com/golang-jwt/jwt/v5` for API authentication.
+* **Sessions:** `github.com/alexedwards/scs/v2` (or similar) for session management and flash messages.
+* **Input Validation:** `github.com/go-playground/validator/v10` for powerful struct-based validation.
+* **Database:** (e.g., PostgreSQL, MySQL) for data persistence.
+* **Logging:** Standard library `log` or a structured logging library.
+
+## Project Structure
+
+The project is organized into logical packages reflecting different layers and concerns of the application, promoting modularity and maintainability.
+
+/project-root
+├── app/             # Contains the core Application struct for shared resources (Logger, DB, Config, Session)
+│   └── application.go
+│   └── context_keys.go # Custom type for context keys (e.g., for UserID)
+│
+├── controllers/     # Houses HTTP handlers / controllers for various application interfaces
+│   └── web/         # Web-specific HTTP handlers responsible for interacting with HTML views
+│       └── web_handlers.go
+│       └── routes.go # (If routes are defined in a separate file within controllers/web)
+│
+├── services/        # Contains core business logic and service implementations
+│   ├── auth_service.go    # Handles authentication logic (JWT, session, user authentication)
+│   ├── user_service.go    # Manages user-related business logic
+│   ├── html_template_service.go # Service for rendering HTML templates
+│   └── (other_services).go # e.g., product_service.go, order_service.go
+│
+├── internal/        # A collection of internal utility and helper packages,
+│   │                # typically not intended for direct import by other Go modules
+│   ├── app_constants/   # Defines application-wide constants
+│   │   └── constants.go
+│   │
+│   ├── response/      # Provides standardized HTTP response structures (e.g., for JSON error responses)
+│   │   └── response.go
+│   │
+│   └── utils/         # Contains general utility functions
+│       └── helpers.go
+│       └── validation/ # Holds the custom validator setup and related helper functions
+│           └── validator.go
+│
+├── main.go          # The main application entry point, responsible for bootstrapping the server
+├── go.mod           # Go module definition file, managing project dependencies
+└── go.sum           # Go module checksums file, for verifying module authenticity
+
+
+## Setup and Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/dessert-ordering-system.git](https://github.com/your-username/dessert-ordering-system.git)
+    cd dessert-ordering-system
+    ```
+
+2.  **Install Go Modules:**
+    ```bash
+    go mod tidy
+    ```
+
+3.  **Database Setup:**
+    * Ensure you have a [Your Database] instance running (e.g., PostgreSQL).
+    * Create a database for the project.
+    * Run any necessary database migrations (you'll need to implement your migration tool or scripts).
+
+4.  **Environment Variables:**
+    Create a `.env` file in the project root or set the following environment variables:
+    * `PORT=8080` (or your desired port)
+    * `DB_CONNECTION_STRING="host=localhost port=5432 user=youruser password=yourpass dbname=yourdb sslmode=disable"`
+    * `JWT_SECRET="supersecretjwtkey"` (Choose a strong, random key)
+    * `SESSION_SECRET="anothersupersecretkey"` (Choose a strong, random key for session encryption)
+
+## Running the Application
+
+To run the main API server:
+
+```bash
+go run .
+The server should start on the port specified in your PORT environment variable (defaulting to 8080 if not set).
+
+API Endpoints (Examples)
+(You would list your main API endpoints here. For example:)
+
+POST /api/v1/register: User registration.
+POST /api/v1/login: User login (returns JWT or sets session cookie).
+GET /api/v1/profile: Get authenticated user's profile (requires authentication).
+GET /api/v1/desserts: List available desserts.
+POST /api/v1/orders: Create a new order (requires authentication).
+Authentication Details
+The system employs a mixed authentication strategy:
+
+API Clients: Primarily use JWTs. Upon successful login, a JWT is issued and can be stored in an HttpOnly cookie (for browser-based SPAs) or sent in the Authorization: Bearer header (for mobile apps, other services).
+Web Clients: Leverage traditional server-side sessions, typically identified by a session cookie.
+Hybrid Flow: If a user logs in via JWT, their session is also implicitly established/updated, allowing for seamless transitions between API and web-based interactions within the same application.
+Input Validation
+All incoming data from HTTP requests (JSON bodies and form data) is rigorously validated server-side using github.com/go-playground/validator.
+
+Validation rules are defined using struct tags (e.g., validate:"required,email,min=8"). When validation fails:
+
+For API requests (Accept: application/json): A 400 Bad Request status is returned with a structured JSON response detailing field-specific errors.
+For Web forms: The user is typically redirected back to the form with flash messages containing the validation errors, and the form fields are often repopulated with their previous (invalid) input for convenience.
+This ensures data integrity, enhances security, and provides clear feedback to the client.
+
+Contributing
+Contributions are welcome! Please fork the repository and open a pull request with your changes.
+
+License
+This project is licensed under the MIT License - see the LICENSE file for details.
