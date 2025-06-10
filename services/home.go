@@ -29,6 +29,7 @@ type HomeTemplateData struct {
 	IsCartEmpty       bool
 	TotalCartPrice    string
 	TotalCartQuantity int
+	UserID            int
 }
 
 func (c HomeTemplateData) String() string {
@@ -62,6 +63,12 @@ func (s *HomeTemplateDataService) WithCsrfToken(csrfToken string) GetHomeTemplat
 	}
 }
 
+func (s *HomeTemplateDataService) WithUserID(userID int) GetHomeTemplateContentOptionsFunc {
+	return func(opts *HomeTemplateData) {
+		opts.UserID = userID
+	}
+}
+
 func (s *HomeTemplateDataService) WithErrors(errs []string) GetHomeTemplateContentOptionsFunc {
 	return func(opts *HomeTemplateData) {
 		opts.Errors = append(opts.Errors, errs...)
@@ -76,7 +83,7 @@ func (s *HomeTemplateDataService) GetHomeTemplateContent(opts ...GetHomeTemplate
 		fn(templateContent)
 	}
 
-	userID := 1
+	userID := templateContent.UserID
 	products, err := s.ProductModel.GetAllProducts()
 	if err != nil {
 		log.Printf("ERROR: HomeTemplateDataService.GetHomeTemplateContent - Failed to get all products: %v", err)

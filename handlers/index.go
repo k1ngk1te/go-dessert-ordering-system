@@ -20,14 +20,17 @@ func NewWebHandlers(a *app.Application) *WebHandler {
 
 func (h *WebHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 	acceptType := r.Header.Get("Accept")
-	csrfToken := h.Session.GetString(r.Context(), appConstants.X_CSRF_Token)
+	csrfToken := h.Session.GetCsrfToken(r.Context())
 
 	if strings.HasPrefix(acceptType, "application/json") {
 		response := responses.NewSuccessJsonResponse("Welcome To The Dessert Ordering System")
 		responses.WriteJsonHeadersResponse(w, http.StatusOK, response, map[string]string{appConstants.X_CSRF_Token: csrfToken})
 		return
 	}
-	htmlContent, err := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+	htmlContent, err := h.Services.HomeTemplateData.GetHomeTemplateContent(
+		h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+		h.Services.HomeTemplateData.WithUserID(h.Session.GetAuthUserID(r.Context())),
+	)
 	sessionFlashError := h.Session.PopString(r.Context(), appConstants.Flash_Error)
 	if sessionFlashError != "" {
 		htmlContent.Errors = append(htmlContent.Errors, sessionFlashError)

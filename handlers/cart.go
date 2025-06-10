@@ -21,15 +21,18 @@ type AddOrder struct {
 
 func (h *WebHandler) GetCartHandler(w http.ResponseWriter, r *http.Request) {
 	acceptType := r.Header.Get("Accept")
+
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
+
 	if strings.HasPrefix(acceptType, "application/json") {
-		cart, err := h.Services.CartItem.GetCart()
+		cart, err := h.Services.CartItem.GetCart(userID)
 		if err != nil {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusInternalServerError, response)
 			return
 		}
 		response := responses.NewSuccessJsonDataResponse("Fetched Cart", cart)
-		csrfToken := h.Session.GetCsrfToken(r.Context())
 		responses.WriteJsonHeadersResponse(w, http.StatusOK, response, map[string]string{appConstants.X_CSRF_Token: csrfToken})
 		return
 	}
@@ -42,6 +45,9 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 	contentType := r.Header.Get("Content-Type")
 
 	var addOrder AddOrder
+
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
 
 	// Json Content
 	if strings.HasPrefix(contentType, "application/json") {
@@ -62,10 +68,13 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 		// Html Content
 		err := r.ParseForm()
 		if err != nil {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
+
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: AddCartItemHandler - ParseForm - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: AddCartItemHandler - ParseForm - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -78,11 +87,13 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 		productIdStr := r.FormValue("productId")
 		productId, err := strconv.Atoi(productIdStr)
 		if err != nil {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: AddCartItemHandler - Get Product - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: AddCartItemHandler - Get Product - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -94,7 +105,7 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 		addOrder.ProductID = productId
 	}
 
-	err := h.Services.CartItem.AddCartItem(addOrder.ProductID)
+	err := h.Services.CartItem.AddCartItem(userID, addOrder.ProductID)
 	if err != nil {
 		if notFoundErr, ok := err.(*appErrors.NotFoundError); ok {
 			// Product not found when trying to add to cart
@@ -102,11 +113,13 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 				response := responses.NewErrorJsonResponse(notFoundErr.Error())
 				responses.WriteJsonResponse(w, http.StatusNotFound, response) // Corrected to 404 Not Found
 			} else {
-				csrfToken := h.Session.GetCsrfToken(r.Context())
-				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+					h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+					h.Services.HomeTemplateData.WithUserID(h.Session.GetAuthUserID(r.Context())),
+				)
 
 				if templateDataErr != nil {
-					h.Loggers.Error.Printf("ERROR: AddCartItemHandler - AddCartItem - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+					h.Loggers.Error.Printf("ERROR: AddCartItemHandler - AddCartItem - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 					http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 					return
 				}
@@ -120,11 +133,13 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 				response := responses.NewErrorJsonResponse("An internal error occurred while adding to cart.")
 				responses.WriteJsonResponse(w, http.StatusInternalServerError, response) // 500 Internal Server Error
 			} else {
-				csrfToken := h.Session.GetCsrfToken(r.Context())
-				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+					h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+					h.Services.HomeTemplateData.WithUserID(userID),
+				)
 
 				if templateDataErr != nil {
-					h.Loggers.Error.Printf("ERROR: AddCartItemHandler - Other Internal Errors - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+					h.Loggers.Error.Printf("ERROR: AddCartItemHandler - Other Internal Errors - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 					http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 					return
 				}
@@ -146,19 +161,24 @@ func (h *WebHandler) AddCartItemHandler(w http.ResponseWriter, r *http.Request) 
 func (h *WebHandler) RemoveSingleCartItemHandler(w http.ResponseWriter, r *http.Request) {
 	pathId := chi.URLParam(r, "product_id")
 	productID, err := strconv.Atoi(pathId)
-
 	acceptType := r.Header.Get("Accept")
+
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
 
 	if err != nil {
 		if strings.HasPrefix(acceptType, "application/json") {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Begin - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Begin - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -168,18 +188,20 @@ func (h *WebHandler) RemoveSingleCartItemHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = h.Services.CartItem.RemoveSingleCartItem(productID)
+	err = h.Services.CartItem.RemoveSingleCartItem(userID, productID)
 	if err != nil || err == models.ErrCartItemNotFound {
 		if notFoundErr, ok := err.(*appErrors.NotFoundError); ok {
 			if strings.HasPrefix(acceptType, "application/json") {
 				response := responses.NewErrorJsonResponse(notFoundErr.Error())
 				responses.WriteJsonResponse(w, http.StatusNotFound, response)
 			} else {
-				csrfToken := h.Session.GetCsrfToken(r.Context())
-				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+					h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+					h.Services.HomeTemplateData.WithUserID(userID),
+				)
 
 				if templateDataErr != nil {
-					h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Failed to Remove - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+					h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Failed to Remove - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 					http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 					return
 				}
@@ -192,11 +214,13 @@ func (h *WebHandler) RemoveSingleCartItemHandler(w http.ResponseWriter, r *http.
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusInternalServerError, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Failed to Close - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: RemoveSingleCartItemHandler - Failed to Close - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -220,16 +244,21 @@ func (h *WebHandler) RemoveCartItemHandler(w http.ResponseWriter, r *http.Reques
 
 	acceptType := r.Header.Get("Accept")
 
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
+
 	if err != nil {
 		if strings.HasPrefix(acceptType, "application/json") {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Begin - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Begin - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -239,18 +268,20 @@ func (h *WebHandler) RemoveCartItemHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = h.Services.CartItem.RemoveCartItem(cartItemId)
+	err = h.Services.CartItem.RemoveCartItem(userID, cartItemId)
 	if err != nil {
 		if notFoundErr, ok := err.(*appErrors.NotFoundError); ok || err == models.ErrCartItemNotFound {
 			if strings.HasPrefix(acceptType, "application/json") {
 				response := responses.NewErrorJsonResponse(notFoundErr.Error())
 				responses.WriteJsonResponse(w, http.StatusNotFound, response)
 			} else {
-				csrfToken := h.Session.GetCsrfToken(r.Context())
-				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+				data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+					h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+					h.Services.HomeTemplateData.WithUserID(userID),
+				)
 
 				if templateDataErr != nil {
-					h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Failed to Remove - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+					h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Failed to Remove - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 					http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 					return
 				}
@@ -263,11 +294,13 @@ func (h *WebHandler) RemoveCartItemHandler(w http.ResponseWriter, r *http.Reques
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusInternalServerError, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Failed to Close - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: RemoveCartItemHandler - Failed to Close - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -286,9 +319,13 @@ func (h *WebHandler) RemoveCartItemHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *WebHandler) CheckoutHandler(w http.ResponseWriter, r *http.Request) {
-	err := h.Services.CartItem.Checkout()
 
 	acceptType := r.Header.Get("Accept")
+
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
+
+	err := h.Services.CartItem.Checkout(userID)
 
 	if err != nil {
 		statusCode := http.StatusBadRequest
@@ -300,11 +337,13 @@ func (h *WebHandler) CheckoutHandler(w http.ResponseWriter, r *http.Request) {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, statusCode, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: CheckoutHandler - Begin - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: CheckoutHandler - Begin - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -325,17 +364,22 @@ func (h *WebHandler) CheckoutHandler(w http.ResponseWriter, r *http.Request) {
 func (h *WebHandler) ConfirmOrderHandler(w http.ResponseWriter, r *http.Request) {
 	acceptType := r.Header.Get("Accept")
 
-	cart, err := h.Services.CartItem.GetCart()
+	csrfToken := h.Session.GetCsrfToken(r.Context())
+	userID := h.Session.GetAuthUserID(r.Context())
+
+	cart, err := h.Services.CartItem.GetCart(userID)
 	if err != nil {
 		if strings.HasPrefix(acceptType, "application/json") {
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: ConfirmOrderHandler - Begin - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: ConfirmOrderHandler - Begin - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}
@@ -356,11 +400,13 @@ func (h *WebHandler) ConfirmOrderHandler(w http.ResponseWriter, r *http.Request)
 			response := responses.NewErrorJsonResponse(err.Error())
 			responses.WriteJsonResponse(w, http.StatusBadRequest, response)
 		} else {
-			csrfToken := h.Session.GetCsrfToken(r.Context())
-			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(h.Services.HomeTemplateData.WithCsrfToken(csrfToken))
+			data, templateDataErr := h.Services.HomeTemplateData.GetHomeTemplateContent(
+				h.Services.HomeTemplateData.WithCsrfToken(csrfToken),
+				h.Services.HomeTemplateData.WithUserID(userID),
+			)
 
 			if templateDataErr != nil {
-				h.Loggers.Error.Printf("ERROR: ConfirmOrderHandler - Failed to Checkout - Failed to get HTML template content for user %d: %v", 1, templateDataErr)
+				h.Loggers.Error.Printf("ERROR: ConfirmOrderHandler - Failed to Checkout - Failed to get HTML template content for user %d: %v", userID, templateDataErr)
 				http.Error(w, "Failed to load page content", http.StatusInternalServerError)
 				return
 			}

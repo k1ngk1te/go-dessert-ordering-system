@@ -14,22 +14,22 @@ func NewCartItemService(cartItemModel *models.CartItemModel) *CartItemService {
 	}
 }
 
-func (ci *CartItemService) GetCart() (models.Cart, error) {
-	return ci.CartItemModel.GetCartItems(1)
+func (ci *CartItemService) GetCart(userID int) (models.Cart, error) {
+	return ci.CartItemModel.GetCartItems(userID)
 }
 
-func (ci *CartItemService) AddCartItem(productID int) error {
-	return ci.CartItemModel.AddCartItem(1, productID, 1)
+func (ci *CartItemService) AddCartItem(userID, productID int) error {
+	return ci.CartItemModel.AddCartItem(userID, productID, 1)
 }
 
-func (ci *CartItemService) RemoveSingleCartItem(productID int) error {
-	return ci.CartItemModel.RemoveSingleCartItem(1, productID)
+func (ci *CartItemService) RemoveSingleCartItem(userID, productID int) error {
+	return ci.CartItemModel.RemoveSingleCartItem(userID, productID)
 }
 
-func (ci *CartItemService) RemoveCartItem(cartItemID int) error {
-	return ci.CartItemModel.RemoveCartItem(1, cartItemID)
+func (ci *CartItemService) RemoveCartItem(userID, cartItemID int) error {
+	return ci.CartItemModel.RemoveCartItem(userID, cartItemID)
 }
 
-func (ci *CartItemService) Checkout() error {
-	return ci.CartItemModel.ClearCart(1)
+func (ci *CartItemService) Checkout(userID int) error {
+	return ci.CartItemModel.ClearCart(userID)
 }
