@@ -17,6 +17,7 @@ import (
 type Application struct {
 	DEBUG     bool
 	DB        *sql.DB
+	JWT       *ApplicationJwt
 	Loggers   *ApplicationLoggers
 	Models    *ApplicationModels
 	Services  *ApplicationServices
@@ -78,6 +79,9 @@ func NewApplication() *Application {
 	sessionManager := openSession(loggers, redisstore.New(redisPool))
 	session := NewApplicationSession(sessionManager)
 
+	// Initialize JWT
+	appJwt := NewApplicationJwt(loggers)
+
 	// Open a database connection
 	db, err := openDB(os.Getenv("DSN"))
 	if err != nil {
@@ -86,11 +90,12 @@ func NewApplication() *Application {
 	loggers.Info.Println("Successfully connected to Database!")
 
 	models := NewApplicationModels(db)
-	services := NewApplicationServices(models)
+	services := NewApplicationServices(models, appJwt)
 
 	a := &Application{
 		DEBUG:     debug,
 		DB:        db,
+		JWT:       appJwt,
 		Loggers:   loggers,
 		Models:    models,
 		Services:  services,

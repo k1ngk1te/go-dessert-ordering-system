@@ -14,9 +14,9 @@ type ApplicationServices struct {
 	RegisterTemplateData *services.RegisterTemplateDataService
 }
 
-func NewApplicationServices(models *ApplicationModels) *ApplicationServices {
+func NewApplicationServices(models *ApplicationModels, JWT *ApplicationJwt) *ApplicationServices {
 	return &ApplicationServices{
-		Auth:                 services.NewAuthService(models.User),
+		Auth:                 services.NewAuthService(models.User, JWT.SECRET),
 		CartItem:             services.NewCartItemService(models.CartItem),
 		Product:              services.NewProductService(models.Product),
 		HomeTemplateData:     services.NewHomeTemplateDataService(models.CartItem, models.Product),
