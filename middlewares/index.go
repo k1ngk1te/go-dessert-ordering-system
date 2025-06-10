@@ -182,6 +182,21 @@ func (m *Middlewares) AuthRequired(next http.Handler) http.Handler {
 				return
 			}
 
+			// Check the CSRF Token
+			csrfTokenFromHeader := r.Header.Get(appConstants.X_CSRF_Token)
+			expectedCsrfToken := m.Session.GetCsrfToken(r.Context())
+
+			if expectedCsrfToken != csrfTokenFromHeader {
+				if strings.HasPrefix(acceptType, "application/json") {
+					response := responses.NewErrorJsonResponse("Invalid CSRF Token")
+					responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
+					return
+				}
+				m.Session.SetFlashError(r.Context(), "Invalid CSRF Token")
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+
 			m.Session.SetAuthUserID(r.Context(), claims.ID)
 			next.ServeHTTP(w, r)
 			return
