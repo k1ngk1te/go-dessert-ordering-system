@@ -1,6 +1,8 @@
 package middlewares
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"slices" // slices.Contains is fine, but direct comparison is also common
 	"strings"
@@ -10,6 +12,9 @@ import (
 	appConstants "dessert-ordering-go-system/internal/app_constants"
 	responses "dessert-ordering-go-system/internal/response"
 	utils "dessert-ordering-go-system/internal/utils"
+	services "dessert-ordering-go-system/services"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Middlewares struct {
@@ -105,16 +110,93 @@ func (m *Middlewares) RequireCSRF(next http.Handler) http.Handler {
 
 func (m *Middlewares) AuthRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 1. Get the user ID from the session
+		acceptType := r.Header.Get("Accept")
+
+		// JWT Authentication
+		var tokenString string = ""
+
+		// 1. Try to get the token from the HttpOnly cookie first
+		cookie, err := r.Cookie(appConstants.Jwt_Name)
+		if err == nil {
+			tokenString = cookie.Value
+		} else if errors.Is(err, http.ErrNoCookie) {
+			// 2. If not in the cookie, try the Authorization Header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" {
+				headerParts := strings.Split(authHeader, " ")
+				if len(headerParts) == 2 && headerParts[0] == "Bearer" {
+					tokenString = headerParts[1]
+				}
+			}
+		}
+
+		if tokenString != "" {
+			claims := &services.UserClaims{}
+
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return m.Services.Auth.JWTSecret, nil
+			})
+			if err != nil {
+				if errors.Is(err, jwt.ErrSignatureInvalid) {
+					if strings.HasPrefix(acceptType, "application/json") {
+						response := responses.NewErrorJsonResponse("Invalid token signature")
+						responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
+						return
+					}
+
+					m.Session.SetFlashError(r.Context(), "Invalid token signature")
+					http.Redirect(w, r, "/login", http.StatusSeeOther)
+
+				} else if errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet) {
+					if strings.HasPrefix(acceptType, "application/json") {
+						response := responses.NewErrorJsonResponse("Token expired or not valid yet")
+						responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
+						return
+					}
+
+					m.Session.SetFlashError(r.Context(), "Token expired or not valid yet")
+					http.Redirect(w, r, "/login", http.StatusSeeOther)
+				} else {
+					if strings.HasPrefix(acceptType, "application/json") {
+						response := responses.NewErrorJsonResponse(fmt.Sprintf("Invalid token: %v", err))
+						responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
+						return
+					}
+					m.Session.SetFlashError(r.Context(), fmt.Sprintf("Invalid token: %v", err))
+					http.Redirect(w, r, "/login", http.StatusSeeOther)
+				}
+				return
+			}
+
+			if !token.Valid {
+				if strings.HasPrefix(acceptType, "application/json") {
+					response := responses.NewErrorJsonResponse("Invalid token (general validation failure)")
+					responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
+					return
+				}
+				m.Session.SetFlashError(r.Context(), "Invalid token (general validation failure)")
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+
+			m.Session.SetAuthUserID(r.Context(), claims.ID)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Session Authentication
 		userIDExists := m.Session.Exists(r.Context(), appConstants.Auth_User_ID)
 		if !userIDExists {
-			acceptType := r.Header.Get("Accept")
 			if strings.HasPrefix(acceptType, "application/json") {
 				response := responses.NewErrorJsonResponse("authentication credentials were not found")
 				responses.WriteJsonResponse(w, http.StatusUnauthorized, response)
 				return
 			}
 
+			m.Session.SetFlashError(r.Context(), "authentication credentials were not found")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 		}
 
